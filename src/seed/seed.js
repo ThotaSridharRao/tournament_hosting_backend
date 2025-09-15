@@ -89,7 +89,14 @@ async function seed() {
   });
 
   // Create tournaments
+  // Create tournaments
   const now = new Date();
+  
+  // Tournament 1 - PUBG Global Series 2025 (Featured)
+  const registrationStart1 = new Date(now.getTime() - 1000 * 60 * 60 * 24); // yesterday
+  const registrationEnd1 = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7); // in 7 days
+  const tournamentStart1 = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 8); // in 8 days
+  const tournamentEnd1 = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 9); // in 9 days
   
   // Tournament 1 - PUBG Global Series 2025 (Featured)
   const registrationStart1 = new Date(now.getTime() - 1000 * 60 * 60 * 24); // yesterday
@@ -102,7 +109,13 @@ async function seed() {
     title: 'PUBG Global Series 2025',
     subtitle: 'The Ultimate Global Championship',
     description: 'The biggest PUBG tournament of the year is here! Join us as the best teams from around the world battle it out in London for the title of Global Champions.',
+    slug: 'pubg-global-series-2025',
+    title: 'PUBG Global Series 2025',
+    subtitle: 'The Ultimate Global Championship',
+    description: 'The biggest PUBG tournament of the year is here! Join us as the best teams from around the world battle it out in London for the title of Global Champions.',
     game: 'PUBG',
+    prizePool: 500000,
+    maxTeams: 32,
     prizePool: 500000,
     maxTeams: 32,
     status: 'registration',
