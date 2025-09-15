@@ -3,10 +3,10 @@ const express = require('express');
 const router = express.Router();
 const tournamentsCtrl = require('../controllers/tournaments.controller');
 
-// GET /api/tournaments
+// Note: order matters — featured/stats before :slug
+router.get('/featured', tournamentsCtrl.featured);
+router.get('/stats', tournamentsCtrl.stats);
 router.get('/', tournamentsCtrl.list);
-
-// GET /api/tournaments/:slug
 router.get('/:slug', tournamentsCtrl.getBySlug);
 
 module.exports = router;
