@@ -2,12 +2,12 @@
   "name": "earena_backend",
   "version": "1.0.0",
   "description": "Backend for eArena Tournament Website (Express + MongoDB)",
-  "main": "src/index.js",
+  "main": "api/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "seed": "node src/seed/seed.js",
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js",
+    "seed": "node api/seed/seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
