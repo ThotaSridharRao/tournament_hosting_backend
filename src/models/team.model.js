@@ -1,18 +1,46 @@
 // src/models/team.model.js
-const mongoose = require('mongoose');
 
-const TeamSchema = new mongoose.Schema({
-  name: { type: String, required: true, index: true },
-  tag: { type: String },
-  logoUrl: { type: String, default: '' },
-  members: [
+import mongoose, { Schema } from 'mongoose';
+
+const teamSchema = new Schema(
     {
-      user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-      role: { type: String, default: 'player' } // captain, player
+        name: {
+            type: String,
+            required: [true, "Team name is required"],
+            trim: true,
+            unique: true
+        },
+        tournament: {
+            type: Schema.Types.ObjectId,
+            ref: "Tournament",
+            required: true,
+            index: true // Index for faster queries by tournament
+        },
+        captain: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
+        members: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: "User"
+            }
+        ],
+        status: {
+            type: String,
+            enum: ['pending', 'approved', 'rejected'],
+            default: 'pending'
+        }
+    },
+    {
+        timestamps: true
     }
-  ],
-  captain: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  createdAt: { type: Date, default: Date.now }
-});
+);
 
-module.exports = mongoose.model('Team', TeamSchema);
+// Create a compound index. This is a database-level rule that ensures
+// the combination of a team's name and its tournament must be unique.
+// This prevents two teams from having the same name in the same tournament.
+teamSchema.index({ name: 1, tournament: 1 }, { unique: true });
+
+export const Team = mongoose.model("Team", teamSchema);

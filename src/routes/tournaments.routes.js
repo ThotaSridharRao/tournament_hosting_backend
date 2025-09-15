@@ -1,12 +1,44 @@
-// src/routes/tournaments.routes.js
-const express = require('express');
-const router = express.Router();
-const tournamentsCtrl = require('../controllers/tournaments.controller');
+// src/routes/tournament.routes.js
 
-// Note: order matters — featured/stats before :slug
-router.get('/featured', tournamentsCtrl.featured);
-router.get('/stats', tournamentsCtrl.stats);
-router.get('/', tournamentsCtrl.list);
-router.get('/:slug', tournamentsCtrl.getBySlug);
+import { Router } from 'express';
+import {
+    createTournament,
+    getAllTournaments,
+    getTournamentBySlug,
+    updateTournament, // Import new function
+    deleteTournament  // Import new function
+} from '../controllers/tournament.controller.js';
+import { verifyJWT, isAdmin } from '../middlewares/auth.middleware.js';
+import { upload } from '../middlewares/multer.middleware.js';
 
-module.exports = router;
+const router = Router();
+
+// --- Public Routes ---
+router.route("/")
+    .get(getAllTournaments);
+
+// --- Admin-Only Routes ---
+router.route("/")
+    .post(
+        verifyJWT,
+        isAdmin,
+        upload.single('posterImage'),
+        createTournament
+    );
+
+// Combined route for single tournament operations
+router.route("/:slug")
+    .get(getTournamentBySlug)
+    .patch( // UPDATE route
+        verifyJWT,
+        isAdmin,
+        upload.single('posterImage'),
+        updateTournament
+    )
+    .delete( // DELETE route
+        verifyJWT,
+        isAdmin,
+        deleteTournament
+    );
+
+export default router;

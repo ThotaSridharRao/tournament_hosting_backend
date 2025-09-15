@@ -1,40 +1,59 @@
 // src/app.js
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 
-// Middlewares
-app.use(express.json());
-app.use(cors());
+// --- Global Middleware ---
+
+// Set security-related HTTP headers
 app.use(helmet());
 
-// Rate limiter
+// Enable Cross-Origin Resource Sharing (CORS)
+// This is essential because our frontend and backend run on different ports/domains.
+app.use(cors({
+    origin: process.env.CORS_ORIGIN, // We will add this to our .env file
+    credentials: true
+}));
+
+// Limit repeated requests to the API to prevent brute-force attacks
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 mins
-  max: 100
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per window (15 minutes)
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again after 15 minutes'
 });
 app.use(limiter);
 
-// Routes
-app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date() }));
+// Built-in middleware to parse incoming JSON request bodies
+app.use(express.json({ limit: "16kb" }));
 
-const authRoutes = require('./routes/auth.routes');
-const tournamentsRoutes = require('./routes/tournaments.routes');
-const matchesRoutes = require('./routes/matches.routes');
-const contentRoutes = require('./routes/content.routes');
+// Built-in middleware to parse incoming URL-encoded request bodies
+app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/tournaments', tournamentsRoutes);
-app.use('/api/matches', matchesRoutes);
-app.use('/api/content', contentRoutes);
+// Middleware to serve static files (like uploaded images) from the 'public' directory
+app.use(express.static("src/public"));
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, error: 'Server error' });
-});
 
-module.exports = app;
+// --- Route Imports (we will create these files next) ---
+import authRouter from './routes/auth.routes.js';
+import tournamentRouter from './routes/tournament.routes.js';
+import teamRouter from './routes/team.routes.js';
+import dashboardRouter from './routes/dashboard.routes.js';
+import userRouter from './routes/user.routes.js';        
+import matchRouter from './routes/match.routes.js';
+// --- Routes Declaration ---
+// This tells the app to use the authRouter for any requests starting with '/api/auth'
+app.use("/api/auth", authRouter);
+app.use("/api/tournaments", tournamentRouter);
+app.use("/api/teams", teamRouter);
+app.use("/api/dashboard", dashboardRouter); // MOUNT THE NEW ROUTER
+app.use("/api/users", userRouter);             
+app.use("/api/matches", matchRouter); // MOUNT THE NEW ROUTER
+
+// Export the configured app to be used in src/index.js
+export { app };

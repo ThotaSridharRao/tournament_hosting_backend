@@ -1,21 +1,18 @@
 // src/config/db.js
-const mongoose = require('mongoose');
+
+import mongoose from 'mongoose';
 
 const connectDB = async () => {
-  try {
-    const uri = process.env.MONGODB_URI;
-    if (!uri) {
-      throw new Error('❌ MONGODB_URI not set in .env file');
+    try {
+        // The MONGODB_URI from your .env file already contains the database name.
+        // Mongoose will connect to the database specified in that URI.
+        const connectionInstance = await mongoose.connect(process.env.MONGODB_URI);
+
+        console.log(`\n✅ MongoDB connected !! DB HOST: ${connectionInstance.connection.host}`);
+    } catch (error) {
+        console.error("MONGODB connection FAILED: ", error);
+        process.exit(1); // Exit the process with a failure code
     }
-    await mongoose.connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log('✅ MongoDB connected');
-  } catch (err) {
-    console.error('❌ Failed to connect MongoDB:', err.message);
-    process.exit(1);
-  }
 };
 
-module.exports = connectDB;
+export default connectDB;

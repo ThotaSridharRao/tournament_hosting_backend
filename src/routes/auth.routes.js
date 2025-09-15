@@ -1,11 +1,24 @@
 // src/routes/auth.routes.js
-const express = require('express');
-const router = express.Router();
-const authCtrl = require('../controllers/auth.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
 
-router.post('/register', authCtrl.register);
-router.post('/login', authCtrl.login);
-router.get('/me', authMiddleware, authCtrl.me);
+import { Router } from 'express';
+import {
+    registerUser,
+    loginUser,
+    logoutUser
+} from '../controllers/auth.controller.js';
+import { verifyJWT } from '../middlewares/auth.middleware.js';
 
-module.exports = router;
+const router = Router();
+
+// --- Public Routes ---
+// These endpoints do not require authentication
+router.route("/register").post(registerUser);
+router.route("/login").post(loginUser);
+
+
+// --- Secured Routes ---
+// This endpoint requires a valid JWT to be sent in the request header
+router.route("/logout").post(verifyJWT, logoutUser);
+
+
+export default router;

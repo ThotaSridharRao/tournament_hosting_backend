@@ -1,20 +1,30 @@
-// src/index.js
-require('dotenv').config();
-const app = require('./app');
-const connectDB = require('./config/db');
+import dotenv from 'dotenv';
+import connectDB from './config/db.js';
+import { app } from './app.js';
 
-const PORT = process.env.PORT || 5000;
+// Configure environment variables from the .env file in the root directory
+dotenv.config({
+    path: '../.env'
+});
 
-async function start() {
-  try {
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+const port = process.env.PORT || 8000;
+
+// Connect to the database and start the server
+connectDB()
+.then(() => {
+    // Start listening for requests only after the database is connected
+    app.listen(port, () => {
+        console.log(`✅ Server is running on port: ${port}`);
     });
-  } catch (err) {
-    console.error('❌ Failed to start server:', err.message);
-    process.exit(1);
-  }
-}
 
-start();
+    // Optional: Handle errors from the Express app itself
+    app.on("error", (error) => {
+        console.error("EXPRESS APP ERROR: ", error);
+        throw error;
+    });
+})
+.catch((err) => {
+    // Log a critical error if the database connection fails
+    console.error("MONGO DB connection failed !!! ", err);
+    process.exit(1);
+});
