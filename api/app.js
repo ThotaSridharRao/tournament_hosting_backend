@@ -60,7 +60,7 @@ app.use(express.static("src/public"));
 
 // --- Route Imports ---
 import authRouter from "./routes/auth.routes.js";
-import tournamentRouter from "./routes/tournaments.routes.js"; // ✅ plural for consistency
+import tournamentRouter from "./routes/tournament.routes.js"; // ✅ plural for consistency
 import teamRouter from "./routes/team.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import userRouter from "./routes/user.routes.js";
