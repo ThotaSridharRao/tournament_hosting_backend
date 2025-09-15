@@ -1,35 +1,89 @@
-// src/controllers/tournament.controller.js
-
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Tournament } from '../models/tournament.model.js';
 
-// createTournament, getAllTournaments, getTournamentBySlug functions remain here...
-// ...
+/**
+ * @description Create a new tournament (Admin only)
+ */
+const createTournament = asyncHandler(async (req, res) => {
+    const { title, description, game, prizePool, maxTeams, registrationStart, registrationEnd, tournamentStart, tournamentEnd } = req.body;
+
+    if (!title || !description || !game || !maxTeams || !registrationStart || !registrationEnd || !tournamentStart || !tournamentEnd) {
+        throw new ApiError(400, "All required fields must be provided");
+    }
+
+    const posterImagePath = req.file?.path;
+
+    const tournament = await Tournament.create({
+        title,
+        description,
+        game,
+        prizePool: Number(prizePool) || 0,
+        maxTeams: Number(maxTeams),
+        registrationStart,
+        registrationEnd,
+        tournamentStart,
+        tournamentEnd,
+        organizer: req.user._id,
+        posterImage: posterImagePath || ''
+    });
+
+    return res.status(201).json(
+        new ApiResponse(201, tournament, "Tournament created successfully")
+    );
+});
+
+/**
+ * @description Get all tournaments with filtering and pagination
+ */
+const getAllTournaments = asyncHandler(async (req, res) => {
+    const { status, game } = req.query;
+    
+    const filter = {};
+    if (status) filter.status = status;
+    if (game) filter.game = game;
+
+    const tournaments = await Tournament.find(filter).populate("organizer", "username");
+
+    return res.status(200).json(
+        new ApiResponse(200, tournaments, "Tournaments fetched successfully")
+    );
+});
+
+/**
+ * @description Get a single tournament by its slug
+ */
+const getTournamentBySlug = asyncHandler(async (req, res) => {
+    const { slug } = req.params;
+
+    const tournament = await Tournament.findOne({ slug }).populate("organizer", "username");
+
+    if (!tournament) {
+        throw new ApiError(404, "Tournament not found");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, tournament, "Tournament fetched successfully")
+    );
+});
 
 /**
  * @description Update a tournament's details (Admin only)
- * @route PATCH /api/tournaments/:slug
- * @access Private (Admin)
  */
 const updateTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
     const updateData = req.body;
 
-    // Note: In a real app, if a new posterImage is uploaded (req.file),
-    // you would first upload it to a cloud service, get the new URL,
-    // delete the old image from the cloud, and then add the new URL to updateData.
     if (req.file) {
-        // For now, we'll just log it. Replace with cloud upload logic.
-        console.log("New poster image received:", req.file.path);
+        // In a real app, you would handle cloud upload here
         // updateData.posterImage = newImageUrlFromCloud;
     }
     
     const tournament = await Tournament.findOneAndUpdate(
         { slug },
         { $set: updateData },
-        { new: true } // This option returns the updated document
+        { new: true }
     );
 
     if (!tournament) {
@@ -43,8 +97,6 @@ const updateTournament = asyncHandler(async (req, res) => {
 
 /**
  * @description Delete a tournament (Admin only)
- * @route DELETE /api/tournaments/:slug
- * @access Private (Admin)
  */
 const deleteTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
@@ -55,18 +107,16 @@ const deleteTournament = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Tournament not found");
     }
 
-    // Note: In a real app, you would also delete the associated
-    // posterImage from your cloud storage service here.
-
     return res.status(200).json(
         new ApiResponse(200, {}, "Tournament deleted successfully")
     );
 });
 
+
 export {
     createTournament,
     getAllTournaments,
     getTournamentBySlug,
-    updateTournament, // Add new function to exports
-    deleteTournament  // Add new function to exports
+    updateTournament,
+    deleteTournament
 };
