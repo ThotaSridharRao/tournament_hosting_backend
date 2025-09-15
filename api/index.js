@@ -1,13 +1,26 @@
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import { app } from './app.js';
+import cors from 'cors'; // Import the cors package
 
-// Configure environment variables from the .env file in the root directory
+// Configure environment variables from the .env file
 dotenv.config({
     path: '../.env'
 });
 
 const port = process.env.PORT || 8000;
+
+// --- CORS Configuration ---
+// This setup is crucial for allowing your frontend to communicate with this backend.
+const corsOptions = {
+    // Read the allowed frontend URL from an environment variable for security and flexibility.
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5502', 
+    credentials: true // Allows cookies or authorization headers to be sent
+};
+
+// Apply the CORS middleware to your Express app
+app.use(cors(corsOptions));
+
 
 // Connect to the database and start the server
 connectDB()
