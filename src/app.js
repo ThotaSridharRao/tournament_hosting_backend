@@ -7,11 +7,15 @@ import rateLimit from 'express-rate-limit';
 
 const app = express();
 
+// Trust the Render proxy (important for rate limiting and IP detection)
+app.set('trust proxy', 1);
+
 // --- Global Middleware ---
 
 // Set security-related HTTP headers
 app.use(helmet());
 
+// Rate limiter with proper proxy configuration
 // Enable Cross-Origin Resource Sharing (CORS)
 // This is essential because our frontend and backend run on different ports/domains.
 app.use(cors({
@@ -21,6 +25,14 @@ app.use(cors({
 
 // Limit repeated requests to the API to prevent brute-force attacks
 const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: {
+    success: false,
+    error: 'Too many requests from this IP, please try again later.'
+  }
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // Limit each IP to 100 requests per window (15 minutes)
     standardHeaders: true,
