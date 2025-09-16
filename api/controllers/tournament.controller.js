@@ -13,18 +13,7 @@ const createTournament = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All required fields must be provided");
     }
 
-    // --- CHANGE: Automatically generate a slug from the title ---
-    const slug = title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-        .trim()
-        .replace(/\s+/g, '-'); // Replace spaces with hyphens
 
-    // Check if a tournament with this slug already exists to ensure uniqueness
-    const existingTournament = await Tournament.findOne({ slug });
-    if (existingTournament) {
-        throw new ApiError(409, `A tournament with the name "${title}" already exists.`);
-    }
 
     const posterImagePath = req.file?.path;
 
@@ -40,7 +29,6 @@ const createTournament = asyncHandler(async (req, res) => {
         tournamentEnd,
         organizer: req.user._id,
         posterImage: posterImagePath || '',
-        slug // --- ADDED: Save the generated slug to the database ---
     });
 
     return res.status(201).json(
@@ -90,15 +78,6 @@ const updateTournament = asyncHandler(async (req, res) => {
     // Handle uploaded poster image
     if (req.file) {
         updateData.posterImage = req.file.path || req.file.filename;
-    }
-
-    // If the title is being updated, regenerate the slug
-    if (updateData.title) {
-        updateData.slug = updateData.title
-            .toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .trim()
-            .replace(/\s+/g, '-');
     }
 
     // Find tournament by old slug first

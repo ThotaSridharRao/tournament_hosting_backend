@@ -14,7 +14,7 @@ const router = Router();
 
 // Public routes
 router.get("/", getAllTournaments);
-router.get("/:slug", getTournamentBySlug);
+router.get("/slug/:slug", getTournamentBySlug);
 
 // Admin routes
 router.post(
