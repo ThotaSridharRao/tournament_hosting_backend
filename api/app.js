@@ -56,7 +56,7 @@ app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
 // Middleware to serve static files from the 'public' directory
-app.use(express.static("src/public"));
+app.use(express.static("api/public"));
 
 // --- Route Imports ---
 import authRouter from "./routes/auth.routes.js";
