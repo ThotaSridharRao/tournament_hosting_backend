@@ -1,20 +1,17 @@
-// src/middlewares/multer.middleware.js
+// api/middlewares/multer.middleware.js
 
 import multer from "multer";
+import fs from "fs";
 
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        // This is a temporary storage location.
-        // In a production app, you'd upload this file to a cloud service (like Cloudinary or S3)
-        // and then remove it from local storage.
-        cb(null, "./src/public/temp");
-    },
-    filename: function (req, file, cb) {
-        // We use the original filename. In production, you might want to add a unique suffix.
-        cb(null, file.originalname);
-    }
+  destination: function (req, file, cb) {
+    const dir = "./api/public/temp"; // ✅ matches your project structure
+    fs.mkdirSync(dir, { recursive: true }); // ensure folder exists
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  },
 });
 
-export const upload = multer({
-    storage,
-});
+export const upload = multer({ storage });
