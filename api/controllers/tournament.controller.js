@@ -13,9 +13,17 @@ const createTournament = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All required fields must be provided");
     }
 
+    let posterImageUrl = ''; // Initialize a variable for the final URL
 
+    // Check if a file was uploaded with the request
+    if (req.file) {
+        // 1. Clean the file path provided by multer.
+        //    (e.g., 'api\\public\\temp\\image.jpg' becomes 'temp/image.jpg')
+        const imagePath = req.file.path.replace('api/public/', '').replace(/\\/g, '/');
 
-    const posterImagePath = req.file?.path;
+        // 2. Construct the full, public-facing URL.
+        posterImageUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
+    }
 
     const tournament = await Tournament.create({
         title,
@@ -28,7 +36,7 @@ const createTournament = asyncHandler(async (req, res) => {
         tournamentStart,
         tournamentEnd,
         organizer: req.user._id,
-        posterImage: posterImagePath || '',
+        posterImage: posterImageUrl, // 3. Save the full URL to the database
     });
 
     return res.status(201).json(
@@ -73,26 +81,29 @@ const getTournamentBySlug = asyncHandler(async (req, res) => {
 
 const updateTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
-    const updateData = { ...req.body };
 
-    // This builds and saves a complete, correct URL
-    // In createTournament and updateTournament in the controller
-    if (req.file) {
-        // Remove the internal directory path to get the correct public path
-        const imagePath = req.file.path.replace('api/public/', '');
-
-        // Construct the full, correct URL
-        const posterUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
-        req.body.posterImage = posterUrl;
-    }
-    // Find tournament by old slug first
+    // Find the tournament by its current slug before doing anything else
     const tournament = await Tournament.findOne({ slug });
     if (!tournament) {
         throw new ApiError(404, "Tournament not found");
     }
 
-    // Apply updates
-    Object.assign(tournament, updateData);
+    // Check if a new file was uploaded and add its full URL to req.body
+    if (req.file) {
+        // Clean the file path to get the correct public-facing path
+        const imagePath = req.file.path.replace('api/public/', '').replace(/\\/g, '/');
+
+        // Construct the full, public-facing URL
+        const posterUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
+        
+        // Add the new URL to req.body so it gets applied
+        req.body.posterImage = posterUrl;
+    }
+
+    // Apply all updates from the request body
+    Object.assign(tournament, req.body);
+    
+    // Save the updated tournament
     await tournament.save();
 
     return res.status(200).json(
