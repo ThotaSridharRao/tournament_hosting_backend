@@ -75,11 +75,16 @@ const updateTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
     const updateData = { ...req.body };
 
-    // Handle uploaded poster image
+    // This builds and saves a complete, correct URL
+    // In createTournament and updateTournament in the controller
     if (req.file) {
-        updateData.posterImage = req.file.path || req.file.filename;
-    }
+        // Remove the internal directory path to get the correct public path
+        const imagePath = req.file.path.replace('api/public/', '');
 
+        // Construct the full, correct URL
+        const posterUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
+        req.body.posterImage = posterUrl;
+    }
     // Find tournament by old slug first
     const tournament = await Tournament.findOne({ slug });
     if (!tournament) {
