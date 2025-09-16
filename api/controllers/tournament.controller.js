@@ -82,18 +82,16 @@ const getTournamentBySlug = asyncHandler(async (req, res) => {
     );
 });
 
-/**
- * @description Update a tournament's details (Admin only)
- */
+
 const updateTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
-    const updateData = req.body;
+    const updateData = { ...req.body };
 
+    // Handle uploaded poster image
     if (req.file) {
-        // In a real app, you would handle cloud upload here
-        // updateData.posterImage = newImageUrlFromCloud;
+        updateData.posterImage = req.file.path || req.file.filename;
     }
-    
+
     // If the title is being updated, regenerate the slug
     if (updateData.title) {
         updateData.slug = updateData.title
@@ -103,15 +101,15 @@ const updateTournament = asyncHandler(async (req, res) => {
             .replace(/\s+/g, '-');
     }
 
-    const tournament = await Tournament.findOneAndUpdate(
-        { slug },
-        { $set: updateData },
-        { new: true }
-    );
-
+    // Find tournament by old slug first
+    const tournament = await Tournament.findOne({ slug });
     if (!tournament) {
         throw new ApiError(404, "Tournament not found");
     }
+
+    // Apply updates
+    Object.assign(tournament, updateData);
+    await tournament.save();
 
     return res.status(200).json(
         new ApiResponse(200, tournament, "Tournament updated successfully")
