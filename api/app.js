@@ -101,10 +101,12 @@ import dashboardRouter from "./routes/dashboard.routes.js";
 import userRouter from "./routes/user.routes.js";
 import matchRouter from "./routes/match.routes.js";
 import staticRouter from "./routes/static.routes.js";
+import bracketRouter from "./routes/bracket.routes.js";
 
 // --- Routes Declaration ---
 app.use("/api/auth", authRouter);
 app.use("/api/tournaments", tournamentRouter);
+app.use("/api/tournaments", bracketRouter); // Bracket routes under tournaments
 app.use("/api/teams", teamRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/users", userRouter);

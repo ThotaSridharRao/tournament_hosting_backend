@@ -93,8 +93,65 @@ const tournamentSchema = new Schema(
         },
         format: {
             type: String,
-            enum: ['single-elimination', 'double-elimination', 'round-robin', 'swiss', 'group-stage'],
+            enum: ['single-elimination', 'double-elimination', 'round-robin', 'swiss', 'group-stage', 'multi-round'],
             default: 'single-elimination'
+        },
+        // Schedule events for custom tournament timeline
+        scheduleEvents: [{
+            id: String,
+            title: String,
+            type: {
+                type: String,
+                enum: ['registration', 'match', 'announcement', 'other'],
+                default: 'other'
+            },
+            date: String,
+            time: String,
+            description: String
+        }],
+        // Tournament brackets reference
+        brackets: {
+            type: Schema.Types.ObjectId,
+            ref: 'TournamentBracket'
+        },
+        // Tournament settings
+        settings: {
+            allowLateRegistration: {
+                type: Boolean,
+                default: false
+            },
+            requirePayment: {
+                type: Boolean,
+                default: true
+            },
+            autoAdvancement: {
+                type: Boolean,
+                default: false
+            },
+            publicLeaderboard: {
+                type: Boolean,
+                default: true
+            }
+        },
+        // Tournament statistics
+        stats: {
+            totalRegistrations: {
+                type: Number,
+                default: 0
+            },
+            totalRevenue: {
+                type: Number,
+                default: 0
+            },
+            completedMatches: {
+                type: Number,
+                default: 0
+            }
+        },
+        // Winner information
+        winner: {
+            type: Schema.Types.ObjectId,
+            ref: 'Team'
         }
     },
     {

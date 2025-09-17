@@ -63,4 +63,27 @@ router.get(
   getTeamsForTournament
 );
 
+// Get team data for authenticated user
+router.get(
+  "/:tournamentId/team",
+  verifyJWT,
+  async (req, res) => {
+    try {
+      const { Team } = await import('../models/team.model.js');
+      const team = await Team.findOne({ 
+        tournament: req.params.tournamentId, 
+        captain: req.user._id 
+      }).populate('players');
+      
+      if (!team) {
+        return res.status(404).json({ success: false, message: "Team not found" });
+      }
+      
+      res.json({ success: true, data: team });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+);
+
 export default router;
