@@ -11,8 +11,11 @@ const app = express();
 // Trust the first proxy in front of the app (important for Render/Heroku/etc.)
 app.set("trust proxy", 1);
 
-// Set security-related HTTP headers
-app.use(helmet());
+// Set security-related HTTP headers with CORS-friendly configuration
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
 
 // Define allowed origins for CORS
 const allowedOrigins = [
@@ -38,6 +41,8 @@ app.use(
       }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
   })
 );
 
@@ -60,7 +65,32 @@ app.use(express.json({ limit: "16kb" }));
 // Built-in middleware to parse incoming URL-encoded request bodies
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 
-// Middleware to serve static files from the 'public' directory
+// Global preflight handler for all routes
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.sendStatus(200);
+});
+
+// Middleware to serve static files from the 'public' directory with CORS headers
+app.use('/api/public', (req, res, next) => {
+  // Add CORS headers for static files
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
+app.use('/api/public', express.static("api/public"));
+
+// Also serve static files from the root path for backward compatibility
 app.use(express.static("api/public"));
 
 // --- Route Imports ---
@@ -70,6 +100,7 @@ import teamRouter from "./routes/team.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import userRouter from "./routes/user.routes.js";
 import matchRouter from "./routes/match.routes.js";
+import staticRouter from "./routes/static.routes.js";
 
 // --- Routes Declaration ---
 app.use("/api/auth", authRouter);
@@ -78,6 +109,7 @@ app.use("/api/teams", teamRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/users", userRouter);
 app.use("/api/matches", matchRouter);
+app.use("/api/static", staticRouter);
 
 // --- Error Handling Middleware ---
 // Global error handler - must be after all routes
