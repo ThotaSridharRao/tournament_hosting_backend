@@ -102,7 +102,7 @@ const tournamentSchema = new Schema(
             title: String,
             type: {
                 type: String,
-                enum: ['registration', 'match', 'announcement', 'other'],
+                enum: ['registration', 'match', 'ceremony', 'break', 'announcement', 'other'],
                 default: 'other'
             },
             date: String,

@@ -109,7 +109,7 @@ const createTournament = asyncHandler(async (req, res) => {
  */
 const getAllTournaments = asyncHandler(async (req, res) => {
     const { status, game } = req.query;
-    
+
     const filter = {};
     if (status) filter.status = status;
     if (game) filter.game = game;
@@ -187,14 +187,14 @@ const updateTournament = asyncHandler(async (req, res) => {
 
         // Construct the full, public-facing URL
         const posterUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
-        
+
         // Add the new URL to req.body so it gets applied
         req.body.posterImage = posterUrl;
     }
 
     // Apply all updates from the request body
     Object.assign(tournament, req.body);
-    
+
     // Save the updated tournament
     await tournament.save();
 
@@ -216,10 +216,10 @@ const deleteTournament = asyncHandler(async (req, res) => {
 
     // Import Team model to delete related teams
     const { Team } = await import('../models/team.model.js');
-    
+
     // Delete all teams associated with this tournament
     await Team.deleteMany({ tournament: tournament._id });
-    
+
     // Delete the tournament itself
     await Tournament.findByIdAndDelete(tournament._id);
 
@@ -270,9 +270,9 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     }
 
     // Check if user is already in a team for this tournament
-    const userInTeam = await Team.findOne({ 
-        tournament: tournament._id, 
-        members: req.user._id 
+    const userInTeam = await Team.findOne({
+        tournament: tournament._id,
+        members: req.user._id
     });
     if (userInTeam) {
         throw new ApiError(409, "You are already registered in a team for this tournament");
@@ -351,29 +351,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
 });
 
 /**
- * @description Get all teams for a tournament
- */
-const getTeamsForTournament = asyncHandler(async (req, res) => {
-    const { slug } = req.params;
-
-    const tournament = await Tournament.findOne({ slug });
-    if (!tournament) {
-        throw new ApiError(404, "Tournament not found");
-    }
-
-    const { Team } = await import('../models/team.model.js');
-    
-    const teams = await Team.find({ tournament: tournament._id })
-        .populate('captain', 'username email')
-        .populate('members', 'username email');
-
-    return res.status(200).json(
-        new ApiResponse(200, teams, "Teams fetched successfully")
-    );
-});
-
-/**
- * @description Cancel a tournament (Admin only) - Sets status to cancelled
+ * @description Cancel a tournament (Admin only)
  */
 const cancelTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
@@ -392,6 +370,29 @@ const cancelTournament = asyncHandler(async (req, res) => {
 
     return res.status(200).json(
         new ApiResponse(200, tournament, "Tournament cancelled successfully")
+    );
+});
+
+/**
+ * @description Get teams for a tournament
+ */
+const getTeamsForTournament = asyncHandler(async (req, res) => {
+    const { slug } = req.params;
+
+    const tournament = await Tournament.findOne({ slug }).populate({
+        path: 'participants',
+        populate: {
+            path: 'captain players',
+            select: 'username email name inGameId'
+        }
+    });
+
+    if (!tournament) {
+        throw new ApiError(404, "Tournament not found");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, tournament.participants, "Teams fetched successfully")
     );
 });
 
