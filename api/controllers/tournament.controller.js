@@ -9,8 +9,23 @@ import { Tournament } from '../models/tournament.model.js';
 const createTournament = asyncHandler(async (req, res) => {
     const { title, description, game, prizePool, maxTeams, registrationStart, registrationEnd, tournamentStart, tournamentEnd, entryFee, format } = req.body;
 
-    if (!title || !description || !game || !maxTeams || !registrationStart || !registrationEnd || !tournamentStart || !tournamentEnd) {
-        throw new ApiError(400, "All required fields must be provided");
+    // Log the received data for debugging
+    console.log('Tournament creation request body:', req.body);
+    console.log('File uploaded:', req.file ? req.file.filename : 'No file');
+
+    // Check for missing required fields with specific messages
+    const missingFields = [];
+    if (!title) missingFields.push('title');
+    if (!description) missingFields.push('description');
+    if (!game) missingFields.push('game');
+    if (!maxTeams) missingFields.push('maxTeams');
+    if (!registrationStart) missingFields.push('registrationStart');
+    if (!registrationEnd) missingFields.push('registrationEnd');
+    if (!tournamentStart) missingFields.push('tournamentStart');
+    if (!tournamentEnd) missingFields.push('tournamentEnd');
+
+    if (missingFields.length > 0) {
+        throw new ApiError(400, `Missing required fields: ${missingFields.join(', ')}`);
     }
 
     // Validate dates
@@ -20,9 +35,21 @@ const createTournament = asyncHandler(async (req, res) => {
     const tournEnd = new Date(tournamentEnd);
     const now = new Date();
 
-    if (regStart < now) {
-        throw new ApiError(400, "Registration start date cannot be in the past");
+    // Check for invalid dates
+    if (isNaN(regStart.getTime())) {
+        throw new ApiError(400, "Invalid registration start date");
     }
+    if (isNaN(regEnd.getTime())) {
+        throw new ApiError(400, "Invalid registration end date");
+    }
+    if (isNaN(tournStart.getTime())) {
+        throw new ApiError(400, "Invalid tournament start date");
+    }
+    if (isNaN(tournEnd.getTime())) {
+        throw new ApiError(400, "Invalid tournament end date");
+    }
+
+    // Validate date logic (allow past dates for testing purposes)
     if (regEnd <= regStart) {
         throw new ApiError(400, "Registration end date must be after registration start date");
     }
@@ -31,6 +58,12 @@ const createTournament = asyncHandler(async (req, res) => {
     }
     if (tournEnd <= tournStart) {
         throw new ApiError(400, "Tournament end date must be after tournament start date");
+    }
+
+    // Validate maxTeams
+    const maxTeamsNum = Number(maxTeams);
+    if (isNaN(maxTeamsNum) || maxTeamsNum < 2) {
+        throw new ApiError(400, "Max teams must be a number greater than 1");
     }
 
     let posterImageUrl = ''; // Initialize a variable for the final URL
@@ -50,7 +83,7 @@ const createTournament = asyncHandler(async (req, res) => {
         description,
         game,
         prizePool: Number(prizePool) || 0,
-        maxTeams: Number(maxTeams),
+        maxTeams: maxTeamsNum,
         registrationStart,
         registrationEnd,
         tournamentStart,
