@@ -2,16 +2,12 @@
 
 import { Router } from 'express';
 import { 
-    registerTeamForTournament,
-    getTournamentTeams,  // Import new function
-    updateTeamStatus     // Import new function
+    getTournamentTeams,
+    updateTeamStatus
 } from '../controllers/team.controller.js';
 import { verifyJWT, isAdmin } from '../middlewares/auth.middleware.js';
 
 const router = Router();
-
-// --- User Routes (Secured) ---
-router.route("/register/:slug").post(verifyJWT, registerTeamForTournament);
 
 // Get individual team details
 router.route("/:teamId").get(verifyJWT, async (req, res) => {
