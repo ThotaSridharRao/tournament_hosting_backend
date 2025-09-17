@@ -93,8 +93,27 @@ const tournamentSchema = new Schema(
         },
         format: {
             type: String,
-            enum: ['single-elimination', 'double-elimination', 'round-robin', 'swiss', 'group-stage', 'multi-round'],
+            enum: ['single-elimination', 'double-elimination', 'round-robin', 'swiss', 'group-stage', 'multi-round', 'kp'],
             default: 'single-elimination'
+        },
+        // KP Tournament specific settings
+        kpSettings: {
+            groupSize: {
+                type: Number,
+                default: 25
+            },
+            numberOfGroups: {
+                type: Number,
+                default: 4
+            },
+            qualifiersPerGroup: {
+                type: Number,
+                default: 4
+            },
+            maxPlayersPerTeam: {
+                type: Number,
+                default: 4
+            }
         },
         // Schedule events for custom tournament timeline
         scheduleEvents: [{

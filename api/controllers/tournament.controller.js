@@ -8,7 +8,7 @@ import { ActivityLogger } from './activity.controller.js';
  * @description Create a new tournament (Admin only)
  */
 const createTournament = asyncHandler(async (req, res) => {
-    const { title, description, game, prizePool, maxTeams, registrationStart, registrationEnd, tournamentStart, tournamentEnd, entryFee, format } = req.body;
+    const { title, description, game, prizePool, maxTeams, registrationStart, registrationEnd, tournamentStart, tournamentEnd, entryFee, format, groupSize, numberOfGroups, qualifiersPerGroup, maxPlayersPerTeam } = req.body;
 
     // Log the received data for debugging
     console.log('Tournament creation request body:', req.body);
@@ -79,7 +79,8 @@ const createTournament = asyncHandler(async (req, res) => {
         posterImageUrl = `${req.protocol}://${req.get('host')}/${imagePath}`;
     }
 
-    const tournament = await Tournament.create({
+    // Prepare tournament data
+    const tournamentData = {
         title,
         description,
         game,
@@ -92,9 +93,21 @@ const createTournament = asyncHandler(async (req, res) => {
         entryFee: Number(entryFee) || 0,
         format: format || 'single-elimination',
         organizer: req.user._id,
-        posterImage: posterImageUrl, // 3. Save the full URL to the database
-        status: 'upcoming' // Default status
-    });
+        posterImage: posterImageUrl,
+        status: 'upcoming'
+    };
+
+    // Add KP settings if format is KP
+    if (format === 'kp') {
+        tournamentData.kpSettings = {
+            groupSize: Number(groupSize) || 25,
+            numberOfGroups: Number(numberOfGroups) || 4,
+            qualifiersPerGroup: Number(qualifiersPerGroup) || 4,
+            maxPlayersPerTeam: Number(maxPlayersPerTeam) || 4
+        };
+    }
+
+    const tournament = await Tournament.create(tournamentData);
 
     // Log tournament creation activity
     await ActivityLogger.tournamentCreated(tournament, req.user);
@@ -234,23 +247,29 @@ const deleteTournament = asyncHandler(async (req, res) => {
  */
 const registerTeamForTournament = asyncHandler(async (req, res) => {
     const { slug } = req.params;
-    const { teamName, players } = req.body;
+    const { teamName, players, teamTag, teamDescription, acceptTerms } = req.body;
 
     if (!teamName || !players || !Array.isArray(players) || players.length === 0) {
         throw new ApiError(400, "Team name and players information are required");
     }
 
-    if (players.length > 4) {
-        throw new ApiError(400, "Maximum 4 players allowed per team");
+    if (!acceptTerms) {
+        throw new ApiError(400, "You must accept the terms and conditions");
     }
 
+    // Get max players per team from tournament settings
     const tournament = await Tournament.findOne({ slug });
     if (!tournament) {
         throw new ApiError(404, "Tournament not found");
     }
 
+    const maxPlayers = tournament.format === 'kp' ? tournament.kpSettings?.maxPlayersPerTeam || 4 : 4;
+    if (players.length > maxPlayers) {
+        throw new ApiError(400, `Maximum ${maxPlayers} players allowed per team`);
+    }
+
     // Check if tournament is accepting registrations
-    if (tournament.status !== 'registration') {
+    if (!['registration', 'upcoming'].includes(tournament.status)) {
         throw new ApiError(400, "Tournament registration is not open");
     }
 
@@ -281,21 +300,18 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     // Validate player data
     for (let i = 0; i < players.length; i++) {
         const player = players[i];
-        if (!player.name || !player.inGameId || !player.phoneNumber || !player.email) {
-            throw new ApiError(400, `All fields are required for player ${i + 1}`);
+        if (!player.name || !player.inGameId || !player.email) {
+            throw new ApiError(400, `Name, in-game ID, and email are required for player ${i + 1}`);
         }
 
-        // Check for duplicate emails and phone numbers in this tournament
+        // Check for duplicate emails in this tournament
         const existingPlayer = await Player.findOne({
             tournament: tournament._id,
-            $or: [
-                { email: player.email },
-                { phoneNumber: player.phoneNumber }
-            ]
+            email: player.email
         });
 
         if (existingPlayer) {
-            throw new ApiError(409, `Player with email ${player.email} or phone ${player.phoneNumber} is already registered in this tournament`);
+            throw new ApiError(409, `Player with email ${player.email} is already registered in this tournament`);
         }
     }
 
@@ -305,6 +321,8 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     // Create the team first
     const team = await Team.create({
         name: teamName,
+        tag: teamTag,
+        description: teamDescription,
         tournament: tournament._id,
         captain: req.user._id,
         members: [req.user._id],
@@ -319,7 +337,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
         const player = await Player.create({
             name: playerData.name,
             inGameId: playerData.inGameId,
-            phoneNumber: playerData.phoneNumber,
+            phoneNumber: playerData.phoneNumber || '', // Optional field
             email: playerData.email,
             team: team._id,
             tournament: tournament._id,

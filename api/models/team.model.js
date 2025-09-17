@@ -10,6 +10,16 @@ const teamSchema = new Schema(
             trim: true,
             unique: true
         },
+        tag: {
+            type: String,
+            trim: true,
+            maxlength: 10
+        },
+        description: {
+            type: String,
+            trim: true,
+            maxlength: 500
+        },
         tournament: {
             type: Schema.Types.ObjectId,
             ref: "Tournament",
