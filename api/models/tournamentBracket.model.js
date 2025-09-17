@@ -2,6 +2,135 @@
 
 import mongoose, { Schema } from 'mongoose';
 
+const matchSchema = new Schema({
+    matchId: {
+        type: String
+    },
+    opponent: {
+        type: Schema.Types.ObjectId
+    },
+    result: {
+        type: String // 'win', 'loss', 'draw'
+    },
+    score: {
+        type: Number
+    },
+    timestamp: {
+        type: Date
+    }
+});
+
+const teamSchema = new Schema({
+    teamId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Team',
+        required: true
+    },
+    teamName: {
+        type: String
+    },
+    status: {
+        type: String,
+        enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
+        default: 'registered'
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid'],
+        default: 'pending'
+    },
+    groupId: {
+        type: Number
+    },
+    score: {
+        type: Number,
+        default: 0
+    },
+    position: {
+        type: Number
+    },
+    matches: [matchSchema]
+});
+
+const groupSchema = new Schema({
+    groupId: {
+        type: Number
+    },
+    teams: [{
+        type: Schema.Types.ObjectId
+    }],
+    status: {
+        type: String,
+        enum: ['pending', 'active', 'completed'],
+        default: 'pending'
+    },
+    qualifiedTeams: [{
+        type: Schema.Types.ObjectId
+    }]
+});
+
+const roundSchema = new Schema({
+    status: {
+        type: String,
+        enum: ['pending', 'active', 'completed'],
+        default: 'pending'
+    },
+    startTime: {
+        type: Date
+    },
+    endTime: {
+        type: Date
+    },
+    teams: [teamSchema],
+    groups: [groupSchema]
+});
+
+const finalRoundSchema = new Schema({
+    status: {
+        type: String,
+        enum: ['pending', 'active', 'completed'],
+        default: 'pending'
+    },
+    startTime: {
+        type: Date
+    },
+    endTime: {
+        type: Date
+    },
+    teams: [teamSchema],
+    winner: {
+        type: Schema.Types.ObjectId,
+        ref: 'Team'
+    },
+    rankings: [{
+        position: {
+            type: Number
+        },
+        team: {
+            type: Schema.Types.ObjectId,
+            ref: 'Team'
+        },
+        prize: {
+            type: Number
+        }
+    }]
+});
+
+const roundConfigSchema = new Schema({
+    name: {
+        type: String
+    },
+    teamsPerGroup: {
+        type: Number
+    },
+    qualifyingTeams: {
+        type: Number
+    },
+    entryFee: {
+        type: Number
+    }
+});
+
 const tournamentBracketSchema = new Schema({
     tournament: {
         type: Schema.Types.ObjectId,
@@ -24,284 +153,57 @@ const tournamentBracketSchema = new Schema({
         default: 'initialized'
     },
     rounds: {
-        '1': {
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed'],
-                default: 'pending'
-            },
-            startTime: Date,
-            endTime: Date,
-            teams: [{
-                teamId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team',
-                    required: true
-                },
-                teamName: String,
-                status: {
-                    type: String,
-                    enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
-                    default: 'registered'
-                },
-                paymentStatus: {
-                    type: String,
-                    enum: ['pending', 'paid'],
-                    default: 'pending'
-                },
-                groupId: Number,
-                score: {
-                    type: Number,
-                    default: 0
-                },
-                position: Number,
-                matches: [{
-                    matchId: String,
-                    opponent: Schema.Types.ObjectId,
-                    result: String, // 'win', 'loss', 'draw'
-                    score: Number,
-                    timestamp: Date
-                }]
-            }],
-            groups: [{
-                groupId: Number,
-                teams: [Schema.Types.ObjectId],
-                status: {
-                    type: String,
-                    enum: ['pending', 'active', 'completed'],
-                    default: 'pending'
-                },
-                qualifiedTeams: [Schema.Types.ObjectId]
-            }]
-        },
-        '2': {
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed'],
-                default: 'pending'
-            },
-            startTime: Date,
-            endTime: Date,
-            teams: [{
-                teamId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team'
-                },
-                teamName: String,
-                status: {
-                    type: String,
-                    enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
-                    default: 'registered'
-                },
-                paymentStatus: {
-                    type: String,
-                    enum: ['pending', 'paid'],
-                    default: 'pending'
-                },
-                groupId: Number,
-                score: {
-                    type: Number,
-                    default: 0
-                },
-                position: Number,
-                matches: [{
-                    matchId: String,
-                    opponent: Schema.Types.ObjectId,
-                    result: String,
-                    score: Number,
-                    timestamp: Date
-                }]
-            }],
-            groups: [{
-                groupId: Number,
-                teams: [Schema.Types.ObjectId],
-                status: {
-                    type: String,
-                    enum: ['pending', 'active', 'completed'],
-                    default: 'pending'
-                },
-                qualifiedTeams: [Schema.Types.ObjectId]
-            }]
-        },
-        '3': {
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed'],
-                default: 'pending'
-            },
-            startTime: Date,
-            endTime: Date,
-            teams: [{
-                teamId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team'
-                },
-                teamName: String,
-                status: {
-                    type: String,
-                    enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
-                    default: 'registered'
-                },
-                paymentStatus: {
-                    type: String,
-                    enum: ['pending', 'paid'],
-                    default: 'pending'
-                },
-                groupId: Number,
-                score: {
-                    type: Number,
-                    default: 0
-                },
-                position: Number,
-                matches: [{
-                    matchId: String,
-                    opponent: Schema.Types.ObjectId,
-                    result: String,
-                    score: Number,
-                    timestamp: Date
-                }]
-            }],
-            groups: [{
-                groupId: Number,
-                teams: [Schema.Types.ObjectId],
-                status: {
-                    type: String,
-                    enum: ['pending', 'active', 'completed'],
-                    default: 'pending'
-                },
-                qualifiedTeams: [Schema.Types.ObjectId]
-            }]
-        },
-        '4': {
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed'],
-                default: 'pending'
-            },
-            startTime: Date,
-            endTime: Date,
-            teams: [{
-                teamId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team'
-                },
-                teamName: String,
-                status: {
-                    type: String,
-                    enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
-                    default: 'registered'
-                },
-                paymentStatus: {
-                    type: String,
-                    enum: ['pending', 'paid'],
-                    default: 'pending'
-                },
-                groupId: Number,
-                score: {
-                    type: Number,
-                    default: 0
-                },
-                position: Number,
-                matches: [{
-                    matchId: String,
-                    opponent: Schema.Types.ObjectId,
-                    result: String,
-                    score: Number,
-                    timestamp: Date
-                }]
-            }],
-            groups: [{
-                groupId: Number,
-                teams: [Schema.Types.ObjectId],
-                status: {
-                    type: String,
-                    enum: ['pending', 'active', 'completed'],
-                    default: 'pending'
-                },
-                qualifiedTeams: [Schema.Types.ObjectId]
-            }]
-        },
-        'final': {
-            status: {
-                type: String,
-                enum: ['pending', 'active', 'completed'],
-                default: 'pending'
-            },
-            startTime: Date,
-            endTime: Date,
-            teams: [{
-                teamId: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team'
-                },
-                teamName: String,
-                status: {
-                    type: String,
-                    enum: ['registered', 'paid', 'active', 'qualified', 'eliminated'],
-                    default: 'registered'
-                },
-                paymentStatus: {
-                    type: String,
-                    enum: ['pending', 'paid'],
-                    default: 'paid'
-                },
-                score: {
-                    type: Number,
-                    default: 0
-                },
-                position: Number,
-                matches: [{
-                    matchId: String,
-                    opponent: Schema.Types.ObjectId,
-                    result: String,
-                    score: Number,
-                    timestamp: Date
-                }]
-            }],
-            winner: {
-                type: Schema.Types.ObjectId,
-                ref: 'Team'
-            },
-            rankings: [{
-                position: Number,
-                team: {
-                    type: Schema.Types.ObjectId,
-                    ref: 'Team'
-                },
-                prize: Number
-            }]
-        }
+        '1': roundSchema,
+        '2': roundSchema,
+        '3': roundSchema,
+        '4': roundSchema,
+        'final': finalRoundSchema
     },
     roundConfig: {
         '1': {
-            name: 'Round 1',
-            teamsPerGroup: 25,
-            qualifyingTeams: 4,
-            entryFee: 100
+            type: roundConfigSchema,
+            default: {
+                name: 'Round 1',
+                teamsPerGroup: 25,
+                qualifyingTeams: 4,
+                entryFee: 100
+            }
         },
         '2': {
-            name: 'Round 2',
-            teamsPerGroup: 4,
-            qualifyingTeams: 4,
-            entryFee: 200
+            type: roundConfigSchema,
+            default: {
+                name: 'Round 2',
+                teamsPerGroup: 4,
+                qualifyingTeams: 4,
+                entryFee: 200
+            }
         },
         '3': {
-            name: 'Round 3',
-            teamsPerGroup: 4,
-            qualifyingTeams: 4,
-            entryFee: 300
+            type: roundConfigSchema,
+            default: {
+                name: 'Round 3',
+                teamsPerGroup: 4,
+                qualifyingTeams: 4,
+                entryFee: 300
+            }
         },
         '4': {
-            name: 'Round 4',
-            teamsPerGroup: 4,
-            qualifyingTeams: 4,
-            entryFee: 500
+            type: roundConfigSchema,
+            default: {
+                name: 'Round 4',
+                teamsPerGroup: 4,
+                qualifyingTeams: 4,
+                entryFee: 500
+            }
         },
         'final': {
-            name: 'Finals',
-            teamsPerGroup: 16,
-            qualifyingTeams: 1,
-            entryFee: 0
+            type: roundConfigSchema,
+            default: {
+                name: 'Finals',
+                teamsPerGroup: 16,
+                qualifyingTeams: 1,
+                entryFee: 0
+            }
         }
     },
     stats: {
