@@ -269,8 +269,22 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     }
 
     // Check if tournament is accepting registrations
-    if (!['registration', 'upcoming'].includes(tournament.status)) {
-        throw new ApiError(400, "Tournament registration is not open");
+    const now = new Date();
+    const regStart = new Date(tournament.registrationStart);
+    const regEnd = new Date(tournament.registrationEnd);
+    
+    const isRegistrationOpen = now >= regStart && now <= regEnd;
+    const validStatuses = ['registration', 'upcoming'];
+    
+    // Allow registration if status is valid OR if we're within registration dates
+    if (!validStatuses.includes(tournament.status) && !isRegistrationOpen) {
+        throw new ApiError(400, `Tournament registration is not open. Status: ${tournament.status}, Registration period: ${regStart.toDateString()} - ${regEnd.toDateString()}`);
+    }
+    
+    // Auto-update tournament status if we're in registration period
+    if (isRegistrationOpen && tournament.status === 'upcoming') {
+        tournament.status = 'registration';
+        await tournament.save();
     }
 
     // Check if tournament is full
