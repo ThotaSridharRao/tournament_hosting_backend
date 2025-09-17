@@ -27,6 +27,25 @@ const teamSchema = new Schema(
                 ref: "User"
             }
         ],
+        players: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: "Player"
+            }
+        ],
+        paymentStatus: {
+            type: String,
+            enum: ['pending', 'paid', 'failed', 'refunded'],
+            default: 'pending'
+        },
+        paymentId: {
+            type: String,
+            default: null
+        },
+        totalAmount: {
+            type: Number,
+            default: 0
+        },
         status: {
             type: String,
             enum: ['pending', 'approved', 'rejected'],

@@ -5,16 +5,20 @@ import {
   getAllTournaments,
   getTournamentBySlug,
   updateTournament,
-  deleteTournament
+  deleteTournament,
+  cancelTournament,
+  registerTeamForTournament,
+  getTeamsForTournament
 } from '../controllers/tournament.controller.js';
 import { verifyJWT, isAdmin } from '../middlewares/auth.middleware.js';
 import { upload } from '../middlewares/multer.middleware.js';
+import { updateTournamentStatus } from '../middlewares/tournament.middleware.js';
 
 const router = Router();
 
-// Public routes
-router.get("/", getAllTournaments);
-router.get("/slug/:slug", getTournamentBySlug);
+// Public routes (with status update middleware)
+router.get("/", updateTournamentStatus, getAllTournaments);
+router.get("/slug/:slug", updateTournamentStatus, getTournamentBySlug);
 
 // Admin routes
 router.post(
@@ -38,6 +42,25 @@ router.delete(
   verifyJWT,
   isAdmin,
   deleteTournament
+);
+
+router.put(
+  "/:slug/cancel",
+  verifyJWT,
+  isAdmin,
+  cancelTournament
+);
+
+// Team registration routes
+router.post(
+  "/:slug/register",
+  verifyJWT,
+  registerTeamForTournament
+);
+
+router.get(
+  "/:slug/teams",
+  getTeamsForTournament
 );
 
 export default router;

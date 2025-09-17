@@ -46,7 +46,7 @@ const tournamentSchema = new Schema(
         },
         status: {
             type: String,
-            enum: ['upcoming', 'registration', 'live', 'completed'],
+            enum: ['upcoming', 'registration', 'live', 'completed', 'cancelled'],
             default: 'upcoming'
         },
         posterImage: {
@@ -58,15 +58,43 @@ const tournamentSchema = new Schema(
         },
         registrationEnd: {
             type: Date,
-            required: true
+            required: true,
+            validate: {
+                validator: function(value) {
+                    return value > this.registrationStart;
+                },
+                message: 'Registration end date must be after registration start date'
+            }
         },
         tournamentStart: {
             type: Date,
-            required: true
+            required: true,
+            validate: {
+                validator: function(value) {
+                    return value >= this.registrationEnd;
+                },
+                message: 'Tournament start date must be after registration end date'
+            }
         },
         tournamentEnd: {
             type: Date,
-            required: true
+            required: true,
+            validate: {
+                validator: function(value) {
+                    return value > this.tournamentStart;
+                },
+                message: 'Tournament end date must be after tournament start date'
+            }
+        },
+        entryFee: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        format: {
+            type: String,
+            enum: ['single-elimination', 'double-elimination', 'round-robin', 'swiss', 'group-stage'],
+            default: 'single-elimination'
         }
     },
     {

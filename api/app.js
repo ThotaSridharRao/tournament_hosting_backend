@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { ApiError } from "./utils/ApiError.js";
 
 const app = express();
 
@@ -18,6 +19,10 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:5502", // VSCode Live Server default
   "http://127.0.0.1:5500", // Alternate Live Server port
+  "http://127.0.0.1:5501", // Another Live Server port
+  "http://localhost:5500",
+  "http://localhost:5501",
+  "http://localhost:5502",
   process.env.CORS_ORIGIN, // Your deployed frontend (set in .env)
 ];
 
@@ -73,6 +78,27 @@ app.use("/api/teams", teamRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/users", userRouter);
 app.use("/api/matches", matchRouter);
+
+// --- Error Handling Middleware ---
+// Global error handler - must be after all routes
+app.use((err, req, res, next) => {
+  let error = err;
+
+  // If it's not our custom ApiError, create one
+  if (!(error instanceof ApiError)) {
+    const statusCode = error.statusCode || 500;
+    const message = error.message || "Something went wrong";
+    error = new ApiError(statusCode, message, error?.errors || [], err.stack);
+  }
+
+  const response = {
+    success: false,
+    error: error.message,
+    ...(process.env.NODE_ENV === "development" && { stack: error.stack })
+  };
+
+  return res.status(error.statusCode).json(response);
+});
 
 // Export the configured app to be used in src/index.js
 export { app };
