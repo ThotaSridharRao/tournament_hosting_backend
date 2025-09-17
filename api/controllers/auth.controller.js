@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { User } from '../models/user.model.js';
+import { ActivityLogger } from './activity.controller.js';
 
 /**
  * @description Register a new user
@@ -45,7 +46,10 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Something went wrong while registering the user");
     }
 
-    // 7. Send a success response
+    // 7. Log the user registration activity
+    await ActivityLogger.userRegistered(createdUser);
+
+    // 8. Send a success response
     return res.status(201).json(
         new ApiResponse(201, createdUser, "User registered successfully")
     );
@@ -84,7 +88,10 @@ const loginUser = asyncHandler(async (req, res) => {
     // 6. Get user details to send in response (without the password)
     const loggedInUser = await User.findById(user._id).select("-password");
 
-    // 7. Send the response with the token and user data
+    // 7. Log the user login activity
+    await ActivityLogger.userLogin(loggedInUser);
+
+    // 8. Send the response with the token and user data
     return res.status(200).json(
         new ApiResponse(
             200,

@@ -2,6 +2,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Tournament } from '../models/tournament.model.js';
+import { ActivityLogger } from './activity.controller.js';
 
 /**
  * @description Create a new tournament (Admin only)
@@ -94,6 +95,9 @@ const createTournament = asyncHandler(async (req, res) => {
         posterImage: posterImageUrl, // 3. Save the full URL to the database
         status: 'upcoming' // Default status
     });
+
+    // Log tournament creation activity
+    await ActivityLogger.tournamentCreated(tournament, req.user);
 
     return res.status(201).json(
         new ApiResponse(201, tournament, "Tournament created successfully")

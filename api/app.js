@@ -102,6 +102,7 @@ import userRouter from "./routes/user.routes.js";
 import matchRouter from "./routes/match.routes.js";
 import staticRouter from "./routes/static.routes.js";
 import bracketRouter from "./routes/bracket.routes.js";
+import activityRouter from "./routes/activity.routes.js";
 
 // --- Routes Declaration ---
 app.use("/api/auth", authRouter);
@@ -112,6 +113,7 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/users", userRouter);
 app.use("/api/matches", matchRouter);
 app.use("/api/static", staticRouter);
+app.use("/api/activities", activityRouter);
 
 // --- Error Handling Middleware ---
 // Global error handler - must be after all routes

@@ -3,6 +3,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Team } from '../models/team.model.js';
 import { Tournament } from '../models/tournament.model.js';
+import { ActivityLogger } from './activity.controller.js';
 
 /**
  * @description Register a team for a specific tournament.
@@ -53,7 +54,10 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
         $push: { participants: team._id }
     });
 
-    // 8. Send a success response
+    // 8. Log team registration activity
+    await ActivityLogger.teamRegistered(team, tournament, req.user);
+
+    // 9. Send a success response
     return res.status(201).json(
         new ApiResponse(201, team, "Team registered successfully")
     );
