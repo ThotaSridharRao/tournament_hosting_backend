@@ -26,6 +26,11 @@ const allowedOrigins = [
   "http://localhost:5500",
   "http://localhost:5501",
   "http://localhost:5502",
+  "http://localhost:8000", // Additional local ports
+  "http://localhost:8080",
+  "http://127.0.0.1:8000",
+  "http://127.0.0.1:8080",
+  "file://", // Allow file:// protocol for local HTML files
   process.env.CORS_ORIGIN, // Your deployed frontend (set in .env)
 ];
 
@@ -33,10 +38,17 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
+      // In development, allow all origins for testing
+      if (process.env.NODE_ENV === 'development') {
+        callback(null, true);
+        return;
+      }
+      
       // allow requests with no origin (like mobile apps, curl, Postman)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.log('CORS blocked origin:', origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
