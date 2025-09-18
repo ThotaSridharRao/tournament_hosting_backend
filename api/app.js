@@ -116,6 +116,16 @@ import staticRouter from "./routes/static.routes.js";
 import bracketRouter from "./routes/bracket.routes.js";
 import activityRouter from "./routes/activity.routes.js";
 
+// --- Health Check Endpoint ---
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // --- Routes Declaration ---
 app.use("/api/auth", authRouter);
 app.use("/api/tournaments", tournamentRouter);

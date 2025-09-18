@@ -272,15 +272,15 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     const now = new Date();
     const regStart = new Date(tournament.registrationStart);
     const regEnd = new Date(tournament.registrationEnd);
-    
+
     const isRegistrationOpen = now >= regStart && now <= regEnd;
     const validStatuses = ['registration', 'upcoming'];
-    
+
     // Allow registration if status is valid OR if we're within registration dates
     if (!validStatuses.includes(tournament.status) && !isRegistrationOpen) {
         throw new ApiError(400, `Tournament registration is not open. Status: ${tournament.status}, Registration period: ${regStart.toDateString()} - ${regEnd.toDateString()}`);
     }
-    
+
     // Auto-update tournament status if we're in registration period
     if (isRegistrationOpen && tournament.status === 'upcoming') {
         tournament.status = 'registration';
@@ -428,6 +428,33 @@ const getTeamsForTournament = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * @description Get user's team for a specific tournament
+ */
+const getUserTeamForTournament = asyncHandler(async (req, res) => {
+    const { tournamentId } = req.params;
+
+    // Import Team model dynamically to avoid circular dependency
+    const { Team } = await import('../models/team.model.js');
+
+    // Find team where user is a member
+    const team = await Team.findOne({
+        tournament: tournamentId,
+        members: req.user._id
+    })
+        .populate('captain', 'username email')
+        .populate('players')
+        .populate('tournament', 'title slug status');
+
+    if (!team) {
+        throw new ApiError(404, "No team found for this tournament");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, team, "Team fetched successfully")
+    );
+});
+
 export {
     createTournament,
     getAllTournaments,
@@ -436,5 +463,6 @@ export {
     deleteTournament,
     cancelTournament,
     registerTeamForTournament,
-    getTeamsForTournament
+    getTeamsForTournament,
+    getUserTeamForTournament
 };
