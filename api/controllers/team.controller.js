@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
@@ -12,95 +13,142 @@ import { ActivityLogger } from './activity.controller.js';
  * @access Private (Requires user to be logged in)
  */
 const registerTeamForTournament = asyncHandler(async (req, res) => {
-    const { slug } = req.params;
-    const { teamName, players, teamTag, teamDescription, acceptTerms } = req.body;
-    const captainId = req.user?._id;
+  const { slug } = req.params;
+  const { teamName, players, teamTag, teamDescription, acceptTerms } = req.body;
+  const captainId = req.user?._id;
 
-    if (!teamName || !players || !Array.isArray(players) || players.length === 0) {
-        throw new ApiError(400, "Team name and player information are required");
-    }
+  if (!teamName || !players || !Array.isArray(players) || players.length === 0) {
+    throw new ApiError(400, "Team name and player information are required");
+  }
 
-    if (!acceptTerms) {
-        throw new ApiError(400, "You must accept the terms and conditions");
-    }
+  if (!acceptTerms) {
+    throw new ApiError(400, "You must accept the terms and conditions");
+  }
 
-    const tournament = await Tournament.findOne({ slug });
-    if (!tournament) {
-        throw new ApiError(404, "Tournament not found");
-    }
+  const tournament = await Tournament.findOne({ slug });
+  if (!tournament) {
+    throw new ApiError(404, "Tournament not found");
+  }
 
-    const maxPlayers = tournament.kpSettings?.maxPlayersPerTeam || 4;
-    if (players.length > maxPlayers) {
-        throw new ApiError(400, `A maximum of ${maxPlayers} players are allowed per team.`);
-    }
+  const maxPlayers = tournament.kpSettings?.maxPlayersPerTeam || 4;
+  if (players.length > maxPlayers) {
+    throw new ApiError(
+      400,
+      `A maximum of ${maxPlayers} players are allowed per team.`
+    );
+  }
 
-    const now = new Date();
-    const regStart = new Date(tournament.registrationStart);
-    const regEnd = new Date(tournament.registrationEnd);
+  const now = new Date();
+  const regStart = new Date(tournament.registrationStart);
+  const regEnd = new Date(tournament.registrationEnd);
 
-    if (now < regStart || now > regEnd) {
-        throw new ApiError(400, "Registration for this tournament is not currently open.");
-    }
+  if (now < regStart || now > regEnd) {
+    throw new ApiError(400, "Registration for this tournament is not currently open.");
+  }
 
-    if (tournament.participants.length >= tournament.maxTeams) {
-        throw new ApiError(400, "This tournament is full.");
-    }
+  if (tournament.participants.length >= tournament.maxTeams) {
+    throw new ApiError(400, "This tournament is full.");
+  }
 
-    const existingTeam = await Team.findOne({ name: teamName, tournament: tournament._id });
+  // Start a transaction
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Check for duplicate team name
+    const existingTeam = await Team.findOne({
+      name: teamName,
+      tournament: tournament._id,
+    }).session(session);
+
     if (existingTeam) {
-        throw new ApiError(409, "A team with this name already exists in this tournament.");
+      throw new ApiError(409, "A team with this name already exists in this tournament.");
     }
 
+    // Check for duplicate players
     for (const player of players) {
-        const existingPlayer = await Player.findOne({ email: player.email, tournament: tournament._id });
-        if (existingPlayer) {
-            throw new ApiError(409, `A player with the email ${player.email} is already registered in this tournament.`);
-        }
+      const existingPlayer = await Player.findOne({
+        email: player.email,
+        tournament: tournament._id,
+      }).session(session);
+
+      if (existingPlayer) {
+        throw new ApiError(
+          409,
+          `A player with the email ${player.email} is already registered in this tournament.`
+        );
+      }
     }
 
-    const newTeam = await Team.create({
-        name: teamName,
-        tag: teamTag,
-        description: teamDescription,
-        tournament: tournament._id,
-        captain: captainId,
-        members: [captainId],
-        status: 'pending'
-    });
+    // Create team
+    const [newTeam] = await Team.create(
+      [
+        {
+          name: teamName,
+          tag: teamTag,
+          description: teamDescription,
+          tournament: tournament._id,
+          captain: captainId,
+          members: [captainId],
+          status: "pending",
+        },
+      ],
+      { session }
+    );
 
+    // Create players
     const playerDocs = [];
     for (let i = 0; i < players.length; i++) {
-        const playerData = players[i];
-        const isCaptain = i === 0;
+      const p = players[i];
+      const isCaptain = i === 0;
 
-        const newPlayer = new Player({
-            name: playerData.name,
-            inGameId: playerData.inGameId,
-            phoneNumber: playerData.phoneNumber,
-            email: playerData.email,
+      const [newPlayer] = await Player.create(
+        [
+          {
+            name: p.name,
+            inGameId: p.inGameId,
+            phoneNumber: p.phoneNumber,
+            email: p.email,
             team: newTeam._id,
             tournament: tournament._id,
             user: isCaptain ? captainId : null,
-            isCaptain: isCaptain
-        });
-        await newPlayer.save();
-        playerDocs.push(newPlayer._id);
+            isCaptain,
+          },
+        ],
+        { session }
+      );
+
+      playerDocs.push(newPlayer._id);
     }
 
     newTeam.players = playerDocs;
-    await newTeam.save();
+    await newTeam.save({ session });
 
-    await Tournament.findByIdAndUpdate(tournament._id, {
-        $push: { participants: newTeam._id }
-    });
+    tournament.participants.push(newTeam._id);
+    await tournament.save({ session });
 
     await ActivityLogger.teamRegistered(newTeam, tournament, req.user);
 
-    const populatedTeam = await Team.findById(newTeam._id).populate('players');
+    await session.commitTransaction();
+    session.endSession();
 
-    return res.status(201).json(
+    const populatedTeam = await Team.findById(newTeam._id).populate("players");
+
+    return res
+      .status(201)
+      .json(
         new ApiResponse(201, { team: populatedTeam }, "Team registered successfully!")
-    );
+      );
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+
+    if (err.code === 11000) {
+      throw new ApiError(409, "Duplicate key error (team or player already exists)");
+    }
+
+    throw err;
+  }
 });
 
 /**
@@ -109,20 +157,20 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
  * @access Private (Admin)
  */
 const getTournamentTeams = asyncHandler(async (req, res) => {
-    const { slug } = req.params;
+  const { slug } = req.params;
 
-    const tournament = await Tournament.findOne({ slug });
-    if (!tournament) {
-        throw new ApiError(404, "Tournament not found");
-    }
+  const tournament = await Tournament.findOne({ slug });
+  if (!tournament) {
+    throw new ApiError(404, "Tournament not found");
+  }
 
-    const teams = await Team.find({ tournament: tournament._id })
-        .populate("captain", "username email")
-        .populate("players");
+  const teams = await Team.find({ tournament: tournament._id })
+    .populate("captain", "username email")
+    .populate("players");
 
-    return res.status(200).json(
-        new ApiResponse(200, teams, "Tournament teams fetched successfully")
-    );
+  return res.status(200).json(
+    new ApiResponse(200, teams, "Tournament teams fetched successfully")
+  );
 });
 
 /**
@@ -131,26 +179,26 @@ const getTournamentTeams = asyncHandler(async (req, res) => {
  * @access Private (Admin)
  */
 const updateTeamStatus = asyncHandler(async (req, res) => {
-    const { teamId } = req.params;
-    const { status } = req.body;
+  const { teamId } = req.params;
+  const { status } = req.body;
 
-    if (!['approved', 'rejected'].includes(status)) {
-        throw new ApiError(400, "Invalid status provided");
-    }
+  if (!["approved", "rejected"].includes(status)) {
+    throw new ApiError(400, "Invalid status provided");
+  }
 
-    const updatedTeam = await Team.findByIdAndUpdate(
-        teamId,
-        { $set: { status } },
-        { new: true }
-    );
+  const updatedTeam = await Team.findByIdAndUpdate(
+    teamId,
+    { $set: { status } },
+    { new: true }
+  );
 
-    if (!updatedTeam) {
-        throw new ApiError(404, "Team not found");
-    }
+  if (!updatedTeam) {
+    throw new ApiError(404, "Team not found");
+  }
 
-    return res.status(200).json(
-        new ApiResponse(200, updatedTeam, "Team status updated successfully")
-    );
+  return res.status(200).json(
+    new ApiResponse(200, updatedTeam, "Team status updated successfully")
+  );
 });
 
 /**
@@ -159,34 +207,36 @@ const updateTeamStatus = asyncHandler(async (req, res) => {
  * @access Private (Team Captain)
  */
 const approveTeamForTesting = asyncHandler(async (req, res) => {
-    const { teamId } = req.params;
+  const { teamId } = req.params;
 
-    const team = await Team.findById(teamId);
-    if (!team) {
-        throw new ApiError(404, "Team not found");
-    }
+  const team = await Team.findById(teamId);
+  if (!team) {
+    throw new ApiError(404, "Team not found");
+  }
 
-    // Check if the user is the team captain
-    if (team.captain.toString() !== req.user._id.toString()) {
-        throw new ApiError(403, "Only team captain can approve team for testing");
-    }
+  // Check if the user is the team captain
+  if (team.captain.toString() !== req.user._id.toString()) {
+    throw new ApiError(403, "Only team captain can approve team for testing");
+  }
 
-    // Update team status to approved for testing
-    team.status = 'approved';
-    await team.save();
+  // Update team status to approved for testing
+  team.status = "approved";
+  await team.save();
 
-    const populatedTeam = await Team.findById(team._id)
-        .populate('captain', 'username email')
-        .populate('players');
+  const populatedTeam = await Team.findById(team._id)
+    .populate("captain", "username email")
+    .populate("players");
 
-    return res.status(200).json(
-        new ApiResponse(200, populatedTeam, "Team approved for testing successfully")
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, populatedTeam, "Team approved for testing successfully")
     );
 });
 
 export {
-    registerTeamForTournament,
-    getTournamentTeams,
-    updateTeamStatus,
-    approveTeamForTesting
+  registerTeamForTournament,
+  getTournamentTeams,
+  updateTeamStatus,
+  approveTeamForTesting,
 };
