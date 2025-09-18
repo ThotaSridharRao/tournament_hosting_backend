@@ -3,7 +3,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Team } from '../models/team.model.js';
 import { Tournament } from '../models/tournament.model.js';
-import { Player } from '../models/player.model.js'; 
+import { Player } from '../models/player.model.js';
 import { ActivityLogger } from './activity.controller.js';
 
 /**
@@ -37,7 +37,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     const now = new Date();
     const regStart = new Date(tournament.registrationStart);
     const regEnd = new Date(tournament.registrationEnd);
-    
+
     if (now < regStart || now > regEnd) {
         throw new ApiError(400, "Registration for this tournament is not currently open.");
     }
@@ -50,7 +50,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     if (existingTeam) {
         throw new ApiError(409, "A team with this name already exists in this tournament.");
     }
-    
+
     for (const player of players) {
         const existingPlayer = await Player.findOne({ email: player.email, tournament: tournament._id });
         if (existingPlayer) {
@@ -64,8 +64,8 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
         description: teamDescription,
         tournament: tournament._id,
         captain: captainId,
-        members: [captainId], 
-        status: 'pending' 
+        members: [captainId],
+        status: 'pending'
     });
 
     const playerDocs = [];
@@ -86,7 +86,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
         await newPlayer.save();
         playerDocs.push(newPlayer._id);
     }
-    
+
     newTeam.players = playerDocs;
     await newTeam.save();
 
@@ -153,8 +153,40 @@ const updateTeamStatus = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * @description Auto-approve team registration for testing purposes
+ * @route PATCH /api/teams/:teamId/approve-testing
+ * @access Private (Team Captain)
+ */
+const approveTeamForTesting = asyncHandler(async (req, res) => {
+    const { teamId } = req.params;
+
+    const team = await Team.findById(teamId);
+    if (!team) {
+        throw new ApiError(404, "Team not found");
+    }
+
+    // Check if the user is the team captain
+    if (team.captain.toString() !== req.user._id.toString()) {
+        throw new ApiError(403, "Only team captain can approve team for testing");
+    }
+
+    // Update team status to approved for testing
+    team.status = 'approved';
+    await team.save();
+
+    const populatedTeam = await Team.findById(team._id)
+        .populate('captain', 'username email')
+        .populate('players');
+
+    return res.status(200).json(
+        new ApiResponse(200, populatedTeam, "Team approved for testing successfully")
+    );
+});
+
 export {
     registerTeamForTournament,
     getTournamentTeams,
-    updateTeamStatus
+    updateTeamStatus,
+    approveTeamForTesting
 };
