@@ -297,19 +297,7 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     const { Team } = await import('../models/team.model.js');
     const { Player } = await import('../models/player.model.js');
 
-    // 🧪 TESTING MODE: Temporarily disabled duplicate name check
-    // Check if team name already exists in this tournament
-    const existingTeam = await Team.findOne({ name: teamName, tournament: tournament._id });
-    if (existingTeam) {
-        console.log(`⚠️ TESTING MODE: Duplicate team found but allowing registration:`, {
-            teamName,
-            existingTeamId: existingTeam._id,
-            existingTeamStatus: existingTeam.status,
-            tournamentId: tournament._id
-        });
-        // Temporarily commented out to allow testing
-        // throw new ApiError(409, `Team name "${teamName}" is already taken in this tournament. Please choose a different name.`);
-    }
+
 
     // Check if user is already in a team for this tournament
     const userInTeam = await Team.findOne({
@@ -344,79 +332,6 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     // Calculate total amount
     const totalAmount = tournament.entryFee || 0;
 
-    // 🧪 TESTING MODE: Create team with enhanced logging
-    console.log(`📝 Creating team with data:`, {
-        name: teamName,
-        tag: teamTag,
-        description: teamDescription,
-        tournament: tournament._id,
-        captain: req.user._id,
-        totalAmount
-    });
-
-    let team;
-    try {
-        team = await Team.create({
-            name: teamName,
-            tag: teamTag,
-            description: teamDescription,
-            tournament: tournament._id,
-            captain: req.user._id,
-            members: [req.user._id],
-            totalAmount,
-            status: 'pending' // Pending until payment is completed
-        });
-        
-        console.log(`✅ Team created successfully:`, {
-            teamId: team._id,
-            teamName: team.name,
-            tournamentId: team.tournament
-        });
-        
-    } catch (error) {
-        console.log(`❌ Team creation failed:`, {
-            error: error.message,
-            code: error.code,
-            teamName,
-            tournamentId: tournament._id
-        });
-        
-        if (error.code === 11000) {
-            // 🧪 TESTING MODE: Log but don't fail on duplicates
-            console.log(`⚠️ TESTING MODE: E11000 error detected but continuing:`, {
-                errorMessage: error.message,
-                keyPattern: error.keyPattern,
-                keyValue: error.keyValue
-            });
-            
-            // For testing, create team with modified name
-            const testTeamName = `${teamName}_${Date.now()}`;
-            console.log(`🔄 Retrying with modified name: ${testTeamName}`);
-            
-            team = await Team.create({
-                name: testTeamName,
-                tag: teamTag,
-                description: teamDescription,
-                tournament: tournament._id,
-                captain: req.user._id,
-                members: [req.user._id],
-                totalAmount,
-                status: 'pending'
-            });
-            
-            console.log(`✅ Team created with modified name:`, {
-                originalName: teamName,
-                modifiedName: testTeamName,
-                teamId: team._id
-            });
-        } else {
-            throw error;
-        }
-    }
-
-    // 🎯 NEW APPROACH: Handle complete team package
-    console.log(`📦 Processing team package: ${teamName} with ${players.length} players`);
-    
     // Validate exact number of players
     const expectedPlayers = maxPlayers;
     if (players.length !== expectedPlayers) {
@@ -439,111 +354,99 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
         throw new ApiError(400, `Duplicate emails found in your team: ${duplicateEmails.join(', ')}. Each player must have a unique email address.`);
     }
 
-    // Create complete team package in one transaction
-    const playerRecords = [];
-    
-    // Use transaction to ensure atomicity
+    // Start a single transaction for both team and player creation
     const session = await mongoose.startSession();
     session.startTransaction();
     
+    let team;
+    let playerRecords = [];
+    
     try {
-        // 🧪 TESTING MODE: Create all players with enhanced logging
-        console.log(`👥 Creating ${players.length} players for team ${team.name}`);
+        // Check for duplicate team name before creating anything
+        const existingTeam = await Team.findOne({ 
+            name: teamName, 
+            tournament: tournament._id 
+        }).session(session);
         
+        if (existingTeam) {
+            throw new ApiError(409, `A team with the name "${teamName}" already exists for this tournament. Please choose a different name.`);
+        }
+
+        // 1. Create the Team document inside the transaction
+        [team] = await Team.create([{
+            name: teamName,
+            tag: teamTag,
+            description: teamDescription,
+            tournament: tournament._id,
+            captain: req.user._id,
+            members: [req.user._id],
+            totalAmount,
+            status: 'pending'
+        }], { session });
+
+        console.log(`✅ Team created: ${team.name} (ID: ${team._id})`);
+
+        // 2. Create all Player documents inside the same transaction
         for (let i = 0; i < players.length; i++) {
             const playerData = players[i];
             
-            console.log(`📝 Creating player ${i + 1}:`, {
-                name: playerData.name,
-                email: playerData.email,
-                inGameId: playerData.inGameId,
-                isCaptain: i === 0
-            });
-            
-            // 🧪 TESTING MODE: Temporarily disable email duplicate check
+            // Check for duplicate player emails across the tournament
             const existingPlayer = await Player.findOne({
                 tournament: tournament._id,
                 email: playerData.email.toLowerCase()
             }).session(session);
             
             if (existingPlayer) {
-                console.log(`⚠️ TESTING MODE: Duplicate email found but allowing:`, {
-                    email: playerData.email,
-                    existingPlayerId: existingPlayer._id
-                });
-                // Temporarily commented out for testing
-                // throw new ApiError(409, `Player with email "${playerData.email}" is already registered in this tournament`);
+                throw new ApiError(409, `Player with email "${playerData.email}" is already registered in this tournament. Each player must have a unique email address.`);
             }
-            
-            const player = await Player.create([{
+
+            const [player] = await Player.create([{
                 name: playerData.name,
                 inGameId: playerData.inGameId,
                 phoneNumber: playerData.phoneNumber || '',
                 email: playerData.email.toLowerCase(),
                 team: team._id,
                 tournament: tournament._id,
-                user: i === 0 ? req.user._id : null, // First player is the captain
+                user: i === 0 ? req.user._id : null,
                 isCaptain: i === 0
             }], { session });
             
-            playerRecords.push(player[0]._id);
-            
-            console.log(`✅ Player ${i + 1} created:`, {
-                playerId: player[0]._id,
-                name: player[0].name,
-                email: player[0].email
-            });
+            playerRecords.push(player._id);
+            console.log(`✅ Player created: ${player.name} (${player.email})`);
         }
-        
+
+        // 3. Update the team with the new player IDs
+        team.players = playerRecords;
+        await team.save({ session });
+
+        // 4. Update the tournament with the new team ID
+        tournament.participants.push(team._id);
+        await tournament.save({ session });
+
+        // Commit the transaction if all operations are successful
         await session.commitTransaction();
-        console.log(`✅ Successfully created team package with ${playerRecords.length} players`);
+        console.log(`🎉 Registration completed successfully: Team "${teamName}" with ${playerRecords.length} players`);
         
     } catch (error) {
+        // Rollback the entire transaction if any error occurs
         await session.abortTransaction();
-        // Clean up the team if player creation failed
-        await Team.findByIdAndDelete(team._id);
+        console.log(`❌ Registration failed, transaction rolled back:`, error.message);
         throw error;
     } finally {
         session.endSession();
     }
 
-    // Update team with player references
-    team.players = playerRecords;
-    await team.save();
-
-    // Add team to tournament participants (check for duplicates first)
-    if (!tournament.participants.includes(team._id)) {
-        tournament.participants.push(team._id);
-        await tournament.save();
-    }
-
+    // Populate team data for response
     const populatedTeam = await Team.findById(team._id)
         .populate('captain', 'username email')
         .populate('players');
-
-    // 🧪 TESTING MODE: Final registration summary
-    console.log(`🎉 REGISTRATION COMPLETE - Summary:`, {
-        teamId: team._id,
-        teamName: team.name,
-        playersCreated: playerRecords.length,
-        playerIds: playerRecords,
-        tournamentId: tournament._id,
-        tournamentParticipants: tournament.participants.length,
-        timestamp: new Date().toISOString()
-    });
 
     return res.status(201).json(
         new ApiResponse(201, {
             team: populatedTeam,
             paymentRequired: totalAmount > 0,
-            totalAmount,
-            // 🧪 TESTING MODE: Include debug info in response
-            debug: {
-                teamId: team._id,
-                playerIds: playerRecords,
-                playersCreated: playerRecords.length
-            }
-        }, "🧪 TESTING MODE: Team registered successfully with enhanced logging!")
+            totalAmount
+        }, "Team registered successfully!")
     );
 });
 
