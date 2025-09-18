@@ -16,11 +16,12 @@ const playerSchema = new Schema(
         },
         phoneNumber: {
             type: String,
-            required: [true, "Phone number is required"],
+            required: false, // Made optional
             trim: true,
             validate: {
                 validator: function(v) {
-                    return /^[6-9]\d{9}$/.test(v); // Indian mobile number format
+                    // Only validate if phone number is provided
+                    return !v || /^[6-9]\d{9}$/.test(v); // Indian mobile number format
                 },
                 message: 'Please enter a valid 10-digit phone number'
             }
@@ -64,6 +65,6 @@ const playerSchema = new Schema(
 
 // Ensure unique player per team
 playerSchema.index({ email: 1, tournament: 1 }, { unique: true });
-playerSchema.index({ phoneNumber: 1, tournament: 1 }, { unique: true });
+// Note: phoneNumber index removed since it's now optional
 
 export const Player = mongoose.model("Player", playerSchema);
