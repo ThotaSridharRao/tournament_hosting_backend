@@ -21,6 +21,7 @@ router.get(
     asyncHandler(async (req, res) => {
         const team = await Team.findById(req.params.teamId)
             .populate("captain", "username email")
+            .populate("players") // ✅ Added players population
             .populate("tournament", "title slug");
 
         if (!team) {

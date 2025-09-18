@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
@@ -305,10 +306,13 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     // Check if user is already in a team for this tournament
     const userInTeam = await Team.findOne({
         tournament: tournament._id,
-        members: req.user._id
+        $or: [
+            { captain: req.user._id },
+            { members: req.user._id }
+        ]
     });
     if (userInTeam) {
-        throw new ApiError(409, "You are already registered in a team for this tournament");
+        throw new ApiError(409, `You are already registered in team "${userInTeam.name}" for this tournament`);
     }
 
     // Validate player data
@@ -333,41 +337,111 @@ const registerTeamForTournament = asyncHandler(async (req, res) => {
     const totalAmount = tournament.entryFee || 0;
 
     // Create the team first
-    const team = await Team.create({
-        name: teamName,
-        tag: teamTag,
-        description: teamDescription,
-        tournament: tournament._id,
-        captain: req.user._id,
-        members: [req.user._id],
-        totalAmount,
-        status: 'pending' // Pending until payment is completed
-    });
-
-    // Create player records
-    const playerRecords = [];
-    for (let i = 0; i < players.length; i++) {
-        const playerData = players[i];
-        const player = await Player.create({
-            name: playerData.name,
-            inGameId: playerData.inGameId,
-            phoneNumber: playerData.phoneNumber || '', // Optional field
-            email: playerData.email,
-            team: team._id,
+    let team;
+    try {
+        team = await Team.create({
+            name: teamName,
+            tag: teamTag,
+            description: teamDescription,
             tournament: tournament._id,
-            user: i === 0 ? req.user._id : null, // First player is the captain/user
-            isCaptain: i === 0
+            captain: req.user._id,
+            members: [req.user._id],
+            totalAmount,
+            status: 'pending' // Pending until payment is completed
         });
-        playerRecords.push(player._id);
+    } catch (error) {
+        if (error.code === 11000) {
+            // Handle duplicate key errors
+            if (error.message.includes('name_1_tournament_1')) {
+                throw new ApiError(409, `Team name "${teamName}" is already taken in this tournament`);
+            }
+            throw new ApiError(409, "A team with this information already exists in this tournament");
+        }
+        throw error;
+    }
+
+    // 🎯 NEW APPROACH: Handle complete team package
+    console.log(`📦 Processing team package: ${teamName} with ${players.length} players`);
+    
+    // Validate exact number of players
+    const expectedPlayers = maxPlayers;
+    if (players.length !== expectedPlayers) {
+        throw new ApiError(400, `This tournament requires exactly ${expectedPlayers} players. You provided ${players.length} players.`);
+    }
+
+    // Validate for duplicate emails within the team package
+    const emailSet = new Set();
+    const duplicateEmails = [];
+    for (const player of players) {
+        const normalizedEmail = player.email.toLowerCase();
+        if (emailSet.has(normalizedEmail)) {
+            duplicateEmails.push(player.email);
+        } else {
+            emailSet.add(normalizedEmail);
+        }
+    }
+    
+    if (duplicateEmails.length > 0) {
+        throw new ApiError(400, `Duplicate emails found in your team: ${duplicateEmails.join(', ')}. Each player must have a unique email address.`);
+    }
+
+    // Create complete team package in one transaction
+    const playerRecords = [];
+    
+    // Use transaction to ensure atomicity
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+        // Create all players in one go
+        for (let i = 0; i < players.length; i++) {
+            const playerData = players[i];
+            
+            // Check if email already exists in tournament
+            const existingPlayer = await Player.findOne({
+                tournament: tournament._id,
+                email: playerData.email.toLowerCase()
+            }).session(session);
+            
+            if (existingPlayer) {
+                throw new ApiError(409, `Player with email "${playerData.email}" is already registered in this tournament`);
+            }
+            
+            const player = await Player.create([{
+                name: playerData.name,
+                inGameId: playerData.inGameId,
+                phoneNumber: playerData.phoneNumber || '',
+                email: playerData.email.toLowerCase(),
+                team: team._id,
+                tournament: tournament._id,
+                user: i === 0 ? req.user._id : null, // First player is the captain
+                isCaptain: i === 0
+            }], { session });
+            
+            playerRecords.push(player[0]._id);
+        }
+        
+        await session.commitTransaction();
+        console.log(`✅ Successfully created team package with ${playerRecords.length} players`);
+        
+    } catch (error) {
+        await session.abortTransaction();
+        // Clean up the team if player creation failed
+        await Team.findByIdAndDelete(team._id);
+        throw error;
+    } finally {
+        session.endSession();
     }
 
     // Update team with player references
     team.players = playerRecords;
     await team.save();
 
-    // Add team to tournament participants
-    tournament.participants.push(team._id);
-    await tournament.save();
+    // Add team to tournament participants (check for duplicates first)
+    if (!tournament.participants.includes(team._id)) {
+        tournament.participants.push(team._id);
+        await tournament.save();
+    }
 
     const populatedTeam = await Team.findById(team._id)
         .populate('captain', 'username email')
